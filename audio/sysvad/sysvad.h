@@ -181,6 +181,9 @@ extern DWORD g_DoNotCreateDataFiles;
 extern DWORD g_DisableBthScoBypass;
 extern UNICODE_STRING g_RegistryPath;
 
+// Custom IOCTL code to read loopback PCM data
+#define IOCTL_SYSVAD_GET_LOOPBACK_DATA CTL_CODE(FILE_DEVICE_UNKNOWN, 0x801, METHOD_BUFFERED, FILE_READ_ACCESS)
+
 //=============================================================================
 // Function prototypes
 //=============================================================================

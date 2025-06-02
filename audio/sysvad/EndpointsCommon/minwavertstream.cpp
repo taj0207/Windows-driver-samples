@@ -6,6 +6,7 @@
 #include "minwavertstream.h"
 #include "UnittestData.h"
 #include "AudioModuleHelper.h"
+#include "../LoopbackBuffer.h"
 #define MINWAVERTSTREAM_POOLTAG 'SRWM'
 
 #pragma warning (disable : 4127)
@@ -1516,7 +1517,19 @@ ByteDisplacement - # of bytes to process.
     while (ByteDisplacement > 0)
     {
         ULONG runWrite = min(ByteDisplacement, m_ulDmaBufferSize - bufferOffset);
+        if (m_pMiniport->IsLoopbackPin(m_ulPin))
+        {
+            ULONG copied = 0;
+            g_LoopbackBuffer.Read(m_pDmaBuffer + bufferOffset, runWrite, &copied);
+            if (copied < runWrite)
+            {
+                RtlZeroMemory(m_pDmaBuffer + bufferOffset + copied, runWrite - copied);
+            }
+        }
+        else
+        {
             m_ToneGenerator.GenerateSine(m_pDmaBuffer + bufferOffset, runWrite);
+        }
         bufferOffset = (bufferOffset + runWrite) % m_ulDmaBufferSize;
         ByteDisplacement -= runWrite;
     }
@@ -1547,6 +1560,7 @@ ByteDisplacement - # of bytes to process.
     while (ByteDisplacement > 0)
     {
         ULONG runWrite = min(ByteDisplacement, m_ulDmaBufferSize - bufferOffset);
+        g_LoopbackBuffer.Write(m_pDmaBuffer + bufferOffset, runWrite);
         m_SaveData.WriteData(m_pDmaBuffer + bufferOffset, runWrite);
         bufferOffset = (bufferOffset + runWrite) % m_ulDmaBufferSize;
         ByteDisplacement -= runWrite;
