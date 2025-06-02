@@ -36,6 +36,8 @@ Abstract:
 #include "a2dphpminipairs.h"
 #endif // SYSVAD_A2DP_SIDEBAND
 
+#include "LoopbackBuffer.h"
+
 
 
 
@@ -577,6 +579,11 @@ Return Value:
         ntStatus,
         DPF(D_ERROR, ("PcInitializeAdapterDriver failed, 0x%x", ntStatus)),
         Done);
+
+    // Initialize loopback PCM buffer
+    g_LoopbackBuffer.Init(DMA_BUFFER_SIZE);
+
+    DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = SysvadDeviceControl;
 
     //
     // To intercept stop/remove/surprise-remove.
@@ -1248,5 +1255,43 @@ Return Value:
 }
 
 #pragma code_seg()
+
+
+// Device control dispatch for custom IOCTLs
+_Dispatch_type_(IRP_MJ_DEVICE_CONTROL)
+NTSTATUS SysvadDeviceControl(
+    _In_ PDEVICE_OBJECT DeviceObject,
+    _Inout_ PIRP Irp
+    )
+{
+    PIO_STACK_LOCATION stack = IoGetCurrentIrpStackLocation(Irp);
+    NTSTATUS status = STATUS_INVALID_DEVICE_REQUEST;
+    ULONG_PTR information = 0;
+
+    UNREFERENCED_PARAMETER(DeviceObject);
+
+    switch (stack->Parameters.DeviceIoControl.IoControlCode)
+    {
+    case IOCTL_SYSVAD_GET_LOOPBACK_DATA:
+    {
+        ULONG outSize = stack->Parameters.DeviceIoControl.OutputBufferLength;
+        PBYTE buffer = (PBYTE)Irp->AssociatedIrp.SystemBuffer;
+        ULONG read = 0;
+        status = g_LoopbackBuffer.Read(buffer, outSize, &read);
+        if (NT_SUCCESS(status))
+        {
+            information = read;
+        }
+        break;
+    }
+    default:
+        break;
+    }
+
+    Irp->IoStatus.Status = status;
+    Irp->IoStatus.Information = information;
+    IoCompleteRequest(Irp, IO_NO_INCREMENT);
+    return status;
+}
 
 
